@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ARQON · Fraud Compensation Desk</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg viewBox="0 0 40 40" class="mark" aria-hidden="true">
+        <path d="M6 34 L20 6 L34 34" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/>
+        <path d="M22 24 L31 33" stroke="url(#g)" stroke-width="3" stroke-linecap="round"/>
+        <circle cx="32" cy="34" r="2.6" fill="#22D3EE"/>
+        <defs><linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#5B5BF7"/><stop offset="1" stop-color="#22D3EE"/></linearGradient></defs>
+      </svg>
+      <div>
+        <div class="wordmark">ARQON</div>
+        <div class="sub">Fraud Compensation Desk</div>
+      </div>
+    </div>
+    <div class="top-right">
+      <span id="mode" class="chip">…</span>
+      <button id="evalsBtn" class="btn ghost">Eval report</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="queue">
+      <div class="queue-head">
+        <h2>Claims queue</h2>
+        <span class="muted small">RBI framework effective 1 Jan 2027</span>
+      </div>
+      <div id="caseList" class="case-list"></div>
+    </aside>
+
+    <section id="workspace" class="workspace">
+      <div class="empty">
+        <h1>AI that shows its work.</h1>
+        <p>Pick a claim. ARQON's agents rebuild what happened from login, device, SIM, OTP and transaction logs, apply the RBI liability rules, check their own citations, and draft the decision for an officer to approve.</p>
+      </div>
+    </section>
+  </main>
+
+  <div id="modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <button class="close" id="modalClose" aria-label="Close">×</button>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

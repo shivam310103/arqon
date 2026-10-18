@@ -1,0 +1,13 @@
+[
+  {"name": "case_id", "type": "STRING"},
+  {"name": "customer", "type": "STRING"},
+  {"name": "account_type", "type": "STRING"},
+  {"name": "segment", "type": "STRING"},
+  {"name": "received_on", "type": "STRING"},
+  {"name": "as_of", "type": "STRING"},
+  {"name": "cross_border", "type": "BOOLEAN"},
+  {"name": "prior_compensation", "type": "BOOLEAN"},
+  {"name": "complaint_text", "type": "STRING"},
+  {"name": "expected", "type": "STRING"},
+  {"name": "story", "type": "STRING"}
+]

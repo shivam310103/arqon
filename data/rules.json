@@ -1,0 +1,51 @@
+{
+  "source": "RBI Responsible Business Conduct (Third Amendment) Directions, 2026 (RBI/2026-27/167 to 173), issued 24 Jun 2026, effective 1 Jan 2027. Rule text summarised from secondary reporting; verify paragraph numbers against the RBI originals before submission.",
+  "rules": [
+    {
+      "id": "R1",
+      "title": "Bank negligence: zero customer liability",
+      "text": "Where the fraudulent transaction results from contributory fraud, negligence or deficiency on the part of the bank, the customer has zero liability, irrespective of whether or when the customer reports it.",
+      "clause_ref": "RBC Third Amendment 2026: zero liability (bank negligence)"
+    },
+    {
+      "id": "R2",
+      "title": "Third-party breach: zero liability if reported in 5 days",
+      "text": "Where the fault lies neither with the bank nor the customer but elsewhere in the system (e.g. telecom provider, payment aggregator, TPAP), the customer has zero liability if the bank is notified within 5 calendar days of the fraud. Later reports are handled under the bank's board-approved policy.",
+      "clause_ref": "RBC Third Amendment 2026: zero liability (third-party breach)"
+    },
+    {
+      "id": "R3",
+      "title": "Customer negligence: liability until reported",
+      "text": "Where the loss is due to customer negligence (e.g. sharing OTP/PIN/password, installing malicious apps, ignoring specific bank scam warnings, not updating contact details), the customer bears the loss until the fraud is reported. Any loss after reporting is borne by the bank.",
+      "clause_ref": "RBC Third Amendment 2026: limited liability (customer negligence)"
+    },
+    {
+      "id": "R4",
+      "title": "Small-value compensation",
+      "text": "An individual (including sole proprietor) who suffers a net loss of up to Rs 50,000 in a bona fide customer-negligence fraud, and reports it to both the bank and the National Cyber Crime Reporting Portal / 1930 within 5 calendar days, receives 85% of net loss or Rs 25,000, whichever is lower. Available once in a lifetime, for frauds occurring within one year from 1 Jan 2027.",
+      "clause_ref": "RBC Third Amendment 2026: compensation for small-value frauds"
+    },
+    {
+      "id": "R5",
+      "title": "Burden of proof on the bank",
+      "text": "The burden of proving customer liability in fraudulent electronic banking transactions lies with the bank. Liability cannot be assigned to the customer without supporting evidence.",
+      "clause_ref": "RBC Third Amendment 2026: burden of proof"
+    },
+    {
+      "id": "R6",
+      "title": "Timelines",
+      "text": "Complaints must be resolved within 45 calendar days (60 for cross-border). Approved compensation must be paid within 5 calendar days of a complete application. Reversals are value-dated to the transaction date.",
+      "clause_ref": "RBC Third Amendment 2026: timelines"
+    }
+  ],
+  "constants": {
+    "reporting_window_days": 5,
+    "compensation_cap_loss": 50000,
+    "compensation_rate": 0.85,
+    "compensation_max": 25000,
+    "resolution_days_domestic": 45,
+    "resolution_days_cross_border": 60,
+    "scheme_start": "2027-01-01",
+    "scheme_end": "2027-12-31"
+  }
+}
