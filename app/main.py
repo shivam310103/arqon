@@ -35,8 +35,8 @@ def cases():
         txns = [e for e in c["events"] if e["type"] == "TXN" and e["attrs"].get("disputed")]
         received = date.fromisoformat(c["received_on"])
         days_left = 45 - (date.fromisoformat(c["as_of"]) - received).days
-        decided = store.get_decisions(c["case_id"])
-        status = decided[-1]["action"].upper() if decided else ("ANALYSED" if c["case_id"] in _cache else "NEW")
+        decided = [x for x in store.get_decisions(c["case_id"]) if x.get("action") != "challenge"]
+        status = ("AWAITING_CHECKER" if decided and decided[-1].get("needs_checker") else decided[-1]["action"].upper()) if decided else ("ANALYSED" if c["case_id"] in _cache else "NEW")
         out.append({"case_id": c["case_id"], "customer": c["customer"], "segment": c["segment"],
                     "amount": sum(t["attrs"]["amount"] for t in txns), "received_on": c["received_on"],
                     "days_left": days_left, "status": status, "story": c["story"],
@@ -65,8 +65,34 @@ def analyze(case_id: str, refresh: bool = False):
     return {**result, "cached": False, "decisions": store.get_decisions(case_id)}
 
 
+# Customer-favourability of each outcome. An override that moves the customer DOWN this scale is held for a
+# second officer (maker-checker), because the RBI framework puts the burden of proof on the bank.
+FAVOUR = {"ZERO_LIABILITY_REFUND": 5, "COMPENSATION": 4, "BANK_POLICY_REVIEW": 3, "PENDING_CUSTOMER_ACTION": 3,
+          "INCOMPLETE_EVIDENCE": 3, "CUSTOMER_LIABLE": 1, "REJECT_NOT_FRAUD": 0}
+
+
+class ChallengeIn(BaseModel):
+    step: str = "evidence"      # evidence | letter
+    question: str
+    officer: str = "Officer"
+
+
+@app.post("/api/cases/{case_id}/challenge")
+def challenge(case_id: str, body: ChallengeIn):
+    if case_id not in _cache:
+        raise HTTPException(400, "Analyse the case first")
+    if not body.question.strip():
+        raise HTTPException(400, "Write what you want the AI to re-check")
+    if body.step not in ("evidence", "letter"):
+        raise HTTPException(400, "Only the investigator and the letter drafter can be challenged; amounts come from the rules engine")
+    res = agents.recheck(store.get_case(case_id), _cache[case_id], body.step, body.question.strip())
+    store.save_decision(case_id, {"action": "challenge", "officer": body.officer, "step": body.step,
+                                  "question": body.question.strip(), **res})
+    return {**_cache[case_id], "cached": True, "decisions": store.get_decisions(case_id)}
+
+
 class DecisionIn(BaseModel):
-    action: str                 # approve | override | request_info
+    action: str                 # approve | override | request_info | checker_approve
     officer: str = "Officer"
     outcome: str | None = None  # required for override
     note: str = ""
@@ -78,8 +104,22 @@ class DecisionIn(BaseModel):
 def decide(case_id: str, body: DecisionIn):
     if case_id not in _cache:
         raise HTTPException(400, "Analyse the case first")
-    if body.action not in ("approve", "override", "request_info"):
+    if body.action not in ("approve", "override", "request_info", "checker_approve"):
         raise HTTPException(400, "Unknown action")
+    history = [x for x in store.get_decisions(case_id) if x.get("action") != "challenge"]
+    pending = history[-1] if history and history[-1].get("needs_checker") else None
+    if body.action == "checker_approve":
+        if not pending:
+            raise HTTPException(400, "Nothing is waiting for a second approval")
+        if body.officer.strip().lower() == pending["officer"].strip().lower():
+            raise HTTPException(400, "A different officer must give the second approval")
+        checker = body.officer.strip()
+        body = DecisionIn(action="override", officer=pending["officer"], outcome=pending["final_outcome"],
+                          note=pending["note"], letter=pending["letter"], resolved_items=pending.get("resolved_items", []))
+    else:
+        checker = None
+    if pending and not checker:
+        raise HTTPException(400, "An override is waiting for a second officer's approval")
     if body.action == "override" and (not body.outcome or not body.note.strip()):
         raise HTTPException(400, "Override needs a new outcome and a reason")
     ai = _cache[case_id]
@@ -95,10 +135,15 @@ def decide(case_id: str, body: DecisionIn):
                   f"Following review by our officer ({body.officer}), the decision on your claim is: {OUTCOME_LABEL.get(final, final)}.\n\n"
                   f"Reason: {body.note.strip()}\n\nIf you are not satisfied, you may approach the RBI Ombudsman via cms.rbi.org.in.\n\n"
                   f"Grievance Redressal Cell")
+    needs_checker = body.action == "override" and not checker and FAVOUR.get(final, 3) < FAVOUR.get(ai["decision"]["outcome"], 3)
+    letter_edited = body.action == "approve" and letter.strip() != ai["letter"]["text"].strip()
     # What happens next. In production these are calls to the bank's notification and core-banking systems;
     # in this prototype they are recorded, not executed.
     dispatch = []
-    if body.action in ("approve", "override"):
+    if needs_checker:
+        dispatch.append({"step": "Held for second approval", "to": "Another officer (maker-checker)",
+                         "status": "this override pays the customer less than the rules engine recommended"})
+    elif body.action in ("approve", "override"):
         dispatch.append({"step": "Decision letter", "to": f"{case['customer']} · registered email + SMS link", "status": "queued (simulated)"})
         pays = amounts.get("bank_pays") if final == ai["decision"]["outcome"] else None
         if final in ("ZERO_LIABILITY_REFUND", "CUSTOMER_LIABLE") and pays:
@@ -111,11 +156,12 @@ def decide(case_id: str, body: DecisionIn):
         "approve": f"Your fraud claim {case_id} has been decided: {OUTCOME_LABEL.get(final, final)}. The full letter is in your email. Not satisfied? cms.rbi.org.in",
         "override": f"Your fraud claim {case_id} has been decided after officer review: {OUTCOME_LABEL.get(final, final)}. The full letter is in your email.",
         "request_info": f"We need more information to decide your fraud claim {case_id}. Please check your email and reply within 7 days.",
-    }[body.action]
+    }[body.action] if not needs_checker else ""
     rec = store.save_decision(case_id, {
         "action": body.action, "officer": body.officer, "note": body.note, "resolved_items": body.resolved_items,
         "ai_outcome": ai["decision"]["outcome"], "final_outcome": final, "letter": letter,
         "dispatch": dispatch, "sms": sms, "saved_to": store.decision_store(),
+        "needs_checker": needs_checker, "checker": checker, "letter_edited": letter_edited,
     })
     return {"saved": rec, "decisions": store.get_decisions(case_id)}
 

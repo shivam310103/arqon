@@ -251,3 +251,16 @@ th { color: var(--muted); font-weight: 500; font-size: 12px; }
 .verdict { grid-template-columns: 1fr 280px; }
 .agree-h { font-weight: 600; color: var(--text); margin-bottom: 4px; display: block !important; }
 .v-ovr { font-size: 13.5px; color: var(--muted); background: var(--soft); border-radius: 8px; padding: 10px 12px; }
+.roles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 0 0 16px; }
+.roles div { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; font-size: 12px; line-height: 1.4; }
+.roles b { display: block; font-size: 12.5px; margin-bottom: 2px; } .roles span { color: var(--muted); }
+.roles div:nth-child(3) { border-color: var(--header); } .roles div:nth-child(4) { border-style: dashed; }
+.challenge { margin-top: 12px; } .challenge .ch-box { display: none; margin-top: 8px; } .challenge.show .ch-box { display: block; }
+.challenge textarea { min-height: 64px; margin-bottom: 6px; } .challenge .note { margin-left: 8px; }
+.link-btn { background: none; border: 0; padding: 0; color: var(--accent); font-weight: 500; font-size: 13px; }
+.ch-item { margin-top: 12px; border-left: 2px solid var(--accent); padding: 4px 0 4px 12px; font-size: 13px; }
+.ch-q { color: var(--muted); } .ch-a { margin-top: 4px; }
+.letter-actions { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; margin-top: 8px; } .letter-actions .btn { margin-top: 0; }
+.challenge.inline { margin-top: 6px; flex: 1; min-width: 280px; }
+.checker { display: flex; gap: 8px; margin-top: 10px; max-width: 460px; }
+@media (max-width: 1100px) { .roles { grid-template-columns: 1fr 1fr; } }

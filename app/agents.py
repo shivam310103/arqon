@@ -44,6 +44,7 @@ class EvidenceOut(BaseModel):
     key_evidence_ids: list[str]
     red_flags: list[str]
     questions_for_officer: list[str]
+    response_to_officer: str = Field(default="", description="Only when an officer challenge is given: 1-3 sentences answering it directly, with citations")
 
 
 # ---------------------------------------------------------------- 1. intake
@@ -98,13 +99,24 @@ def _compact_timeline(t: dict) -> list[dict]:
              "summary": e["summary"], "attrs": e["attrs"]} for e in t["events"]]
 
 
-def evidence(case: dict, timeline: dict, facts: dict) -> dict:
-    prompt = json.dumps({
+CHALLENGE_SYS = (
+    " A human case officer has challenged your previous analysis (given as previous_analysis and officer_challenge). "
+    "Answer the challenge directly in response_to_officer. Change your conclusion only if the evidence supports it; "
+    "do not agree just because the officer asked. Cite event IDs for every claim."
+)
+
+
+def evidence(case: dict, timeline: dict, facts: dict, challenge: dict | None = None) -> dict:
+    payload = {
         "case_id": case["case_id"], "account_type": case["account_type"],
         "customer_statements": facts, "timeline": _compact_timeline(timeline),
-    }, ensure_ascii=False)
+    }
+    if challenge:
+        payload["previous_analysis"] = challenge.get("previous")
+        payload["officer_challenge"] = challenge.get("question")
+    prompt = json.dumps(payload, ensure_ascii=False, default=str)
     try:
-        data, meta = llm.generate_json(EVIDENCE_SYS, prompt, EvidenceOut)
+        data, meta = llm.generate_json(EVIDENCE_SYS + (CHALLENGE_SYS if challenge else ""), prompt, EvidenceOut)
         return {"data": data, "source": "gemini", "meta": meta}
     except Exception as exc:
         print(f"[agents] Gemini call failed, using fallback: {exc!r}"[:600])
@@ -115,7 +127,9 @@ def evidence(case: dict, timeline: dict, facts: dict) -> dict:
                      f"{bp.get('minutes_before_first_txn', '?')} minutes before the first disputed transaction "
                      f"[{bp.get('first_txn_id', '')}]." if bp else "No clear break point in the evidence.")
         return {"data": {"break_point_event_id": bp.get("event_id", ""), "proposed_classification": engine_cls,
-                         "reasoning": reasoning, "key_evidence_ids": ids, "red_flags": [], "questions_for_officer": []},
+                         "reasoning": reasoning, "key_evidence_ids": ids, "red_flags": [], "questions_for_officer": [],
+                         "response_to_officer": ("Gemini is unavailable, so this could not be re-investigated. The rules engine "
+                                                 "re-applied the same evidence and reached the same result.") if challenge else ""},
                 "source": "fallback", "meta": {"reason": str(exc)[:120]}}
 
 
@@ -170,7 +184,7 @@ def _template_letter(case, decision) -> str:
             f"If you are not satisfied, you may approach the RBI Ombudsman via cms.rbi.org.in.\n\nGrievance Redressal Cell")
 
 
-def draft(case: dict, decision: dict) -> dict:
+def draft(case: dict, decision: dict, instruction: str = "") -> dict:
     payload = {
         "customer": case["customer"], "case_id": case["case_id"], "received_on": case["received_on"],
         "outcome": decision["outcome"], "amounts": decision["amounts"], "deadline": decision["deadline"],
@@ -178,12 +192,35 @@ def draft(case: dict, decision: dict) -> dict:
         "findings": [{"check": f["check"], "result": f["result"], "detail": f["detail"], "evidence": f["evidence"]} for f in decision["findings"]],
         "missing": decision["missing"], "required_outcome_sentence": OUTCOME_LINES[decision["outcome"]],
     }
+    if instruction:
+        payload["officer_instruction"] = instruction + " (Follow it unless it changes the outcome or amounts, which are fixed.)"
     try:
         text, meta = llm.generate_text(DRAFT_SYS, json.dumps(payload, ensure_ascii=False, default=str))
         return {"text": text, "source": "gemini", "meta": meta}
     except Exception as exc:
         print(f"[agents] Gemini call failed, using fallback: {exc!r}"[:600])
         return {"text": _template_letter(case, decision), "source": "fallback", "meta": {"reason": str(exc)[:120]}}
+
+
+# ---------------------------------------------------------------- officer challenge
+def recheck(case: dict, result: dict, step: str, question: str) -> dict:
+    """Officer asks an AI step to look again. The AI can change its analysis or wording, never the money:
+    amounts always come from the deterministic rules engine."""
+    if step == "letter":
+        before = result["letter"]["text"]
+        result["letter"] = draft(case, result["decision"], instruction=question)
+        changed = result["letter"]["text"].strip() != before.strip()
+        answer = ("Gemini redrafted the letter." if result["letter"]["source"] == "gemini"
+                  else "Gemini is unavailable; the template letter was regenerated unchanged.")
+        return {"answer": answer, "changed": changed, "source": result["letter"]["source"]}
+    prev = result["evidence"]["data"]
+    ev = evidence(case, result["timeline"], result["intake"]["data"],
+                  challenge={"previous": {k: prev.get(k) for k in ("proposed_classification", "reasoning")}, "question": question})
+    result["evidence"] = ev
+    result["verification"] = {**verify(case, ev, result["decision"]), "source": "code"}
+    changed = ev["data"].get("proposed_classification") != prev.get("proposed_classification")
+    return {"answer": ev["data"].get("response_to_officer") or ev["data"].get("reasoning", ""), "changed": changed,
+            "before": prev.get("proposed_classification"), "after": ev["data"].get("proposed_classification"), "source": ev["source"]}
 
 
 # ---------------------------------------------------------------- pipeline

@@ -29,7 +29,7 @@ const TAG = {
   C1001: ["SIM swap", "t-third"], C1002: ["Fake KYC call", "t-cust"], C1003: ["Card data leak", "t-third"], C1004: ["Remote-access app", "t-cust"],
   C1005: ["Bank error", "t-bank"], C1006: ["Missing log", "t-gap"], C1007: ["Phishing link", "t-cust"], C1008: ["Disputed purchase", "t-gen"],
 };
-const STATUS = { NEW: ["New", "s-new"], ANALYSED: ["Reviewed", "s-done"], APPROVE: ["Approved", "s-ok"], OVERRIDE: ["Overridden", "s-warn"], REQUEST_INFO: ["Waiting on customer", "s-warn"] };
+const STATUS = { NEW: ["New", "s-new"], ANALYSED: ["Reviewed", "s-done"], APPROVE: ["Approved", "s-ok"], OVERRIDE: ["Overridden", "s-warn"], REQUEST_INFO: ["Waiting on customer", "s-warn"], AWAITING_CHECKER: ["Needs 2nd approval", "s-warn"] };
 const ACTION = { approve: ["Approved", "ok"], override: ["Overridden", "warn"], request_info: ["Documents requested", "warn"] };
 
 let current = null;
@@ -130,11 +130,14 @@ function render() {
   const [label, tone] = OUTCOME[d.outcome] || [d.outcome, "warn"];
   const bp = tl.break_point;
   const missing = d.missing || [];
-  const last = (data.decisions || []).slice(-1)[0];
+  const acts = (data.decisions || []).filter((x) => x.action !== "challenge");
+  const challenges = (data.decisions || []).filter((x) => x.action === "challenge");
+  const last = acts.slice(-1)[0];
+  const held = last && last.needs_checker;
   const gemOn = data.evidence.source === "gemini";
   const bpWhen = bp ? (bp.minutes_before_first_txn >= 1440 ? Math.round(bp.minutes_before_first_txn / 1440) + " days" : bp.minutes_before_first_txn + " min") : "";
   const key = tl.events.filter((e) => e.severity !== "normal");
-  const showFinal = last && last.action !== "request_info" ? last.final_outcome : null;
+  const showFinal = last && last.action !== "request_info" && !held ? last.final_outcome : null;
   const [fLabel, fTone] = showFinal ? (OUTCOME[showFinal] || [showFinal, "warn"]) : [label, tone];
   const srcOf = (s) => ({ gemini: "Gemini", fallback: "rules fallback", code: "code" }[s] || s);
   const trace = Object.fromEntries((data.trace || []).map((t) => [t.agent, t]));
@@ -167,7 +170,7 @@ function render() {
           <div class="agree-res">${v.agreement ? "✓ Agree" : "⚠ Disagree: officer must decide"} · ${v.citations_valid}/${v.citations_checked} citations real</div>
         </div>
         <input type="text" id="officer" placeholder="Officer name" value="${esc(last ? last.officer : "")}" />
-        <button class="btn primary" id="approve">Approve &amp; send</button>
+        <button class="btn primary" id="approve" ${held ? "disabled" : ""}>Approve &amp; send</button>
         <div class="why-locked" id="whyLocked"></div>
         <div class="v-btns"><button class="btn sm" id="reqinfo">Request documents</button><button class="btn sm" id="overrideBtn">Override</button></div>
         <div class="override" id="overrideBox">
@@ -181,6 +184,13 @@ function render() {
     <section class="record" id="record">${recordHTML(data.decisions)}</section>
 
     <div class="agents">${AGENTS.map(([k, name, ai], i) => { const t = trace[k] || {}; return `${i ? '<span class="arr">→</span>' : ""}<div class="agent ${t.source === "gemini" ? "gem" : ""}" title="${t.ms ? (t.ms / 1000).toFixed(1) + "s" : ""}"><b>${name}</b><span>${srcOf(t.source || (ai ? "gemini" : "code"))}${k === "Verifier" ? " · " + v.citations_valid + "/" + v.citations_checked : ""}</span></div>`; }).join("")}<span class="arr">→</span><div class="agent human"><b>Officer</b><span>decides</span></div></div>
+
+    <div class="roles">
+      <div><b>Gemini agents</b><span>Investigate, cite evidence, draft. Cannot approve or set amounts.</span></div>
+      <div><b>Rules engine</b><span>Computes who pays what from the RBI rules. Same input, same answer.</span></div>
+      <div><b>Officer</b><span>Approves, challenges any AI step, or overrides with a written reason.</span></div>
+      <div><b>Second officer</b><span>Must confirm any override that pays the customer less.</span></div>
+    </div>
 
     <div class="cols">
       <section class="section">
@@ -198,6 +208,12 @@ function render() {
           <h3>Gemini investigator <span class="tag ${gemOn ? "gem" : ""}">${gemOn ? "Gemini · Vertex AI" : "rules fallback"}</span></h3>
           <div class="reason">${citeify(ev.reasoning, v.invalid_ids)}</div>
           ${v.issues.length ? `<ul class="issues">${v.issues.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+          ${challengesHTML(challenges.filter((x) => x.step === "evidence"), v.invalid_ids)}
+          <div class="challenge" id="chEv">
+            <button class="link-btn" data-open="chEv">Not convinced? Challenge the investigator</button>
+            <div class="ch-box"><textarea placeholder="e.g. The customer says he never received the OTP. Does the evidence support that?"></textarea>
+            <button class="btn sm primary" data-step="evidence">Ask Gemini to re-check</button><span class="note">It must answer from the evidence. It can change its view, not the amounts.</span></div>
+          </div>
           ${ev.questions_for_officer && ev.questions_for_officer.length ? `<div class="q-head">Gemini suggests the officer asks</div><ul class="plain">${ev.questions_for_officer.map((x) => `<li>${citeify(x, v.invalid_ids)}</li>`).join("")}</ul>` : ""}
         </section>
 
@@ -222,8 +238,12 @@ function render() {
 
     <details class="section letter">
       <summary><h3>Decision letter <span class="tag ${data.letter.source === "gemini" ? "gem" : ""}">${data.letter.source === "gemini" ? "Drafted by Gemini" : "Template"} · editable</span></h3></summary>
-      <textarea id="letter">${esc(last ? last.letter : data.letter.text)}</textarea>
-      <button class="btn ghost sm" id="download">Download letter</button>
+      <textarea id="letter">${esc(last && !held ? last.letter : data.letter.text)}</textarea>
+      ${challengesHTML(challenges.filter((x) => x.step === "letter"), [])}
+      <div class="letter-actions"><button class="btn ghost sm" id="download">Download letter</button>
+      <div class="challenge inline" id="chLt"><button class="link-btn" data-open="chLt">Ask Gemini to redraft</button>
+        <div class="ch-box"><textarea placeholder="e.g. Simpler Hindi-friendly English, mention the 5-day payout"></textarea>
+        <button class="btn sm primary" data-step="letter">Redraft</button></div></div></div>
     </details>`;
 
   document.querySelectorAll(".cite[data-ev]").forEach((el) => (el.onclick = (e) => { e.preventDefault(); e.stopPropagation(); flash(el.dataset.ev); }));
@@ -242,14 +262,40 @@ function render() {
   $("#overrideBtn").onclick = () => $("#overrideBox").classList.toggle("show");
   $("#ovSave").onclick = () => decide("override", { outcome: $("#ovOutcome").value, note: $("#ovNote").value });
   $("#download").onclick = downloadLetter;
+  document.querySelectorAll("[data-open]").forEach((b) => (b.onclick = () => $("#" + b.dataset.open).classList.toggle("show")));
+  document.querySelectorAll("[data-step]").forEach((b) => (b.onclick = () => challengeStep(b.dataset.step, b.parentElement.querySelector("textarea").value, b)));
+  const ck = $("#checkerOk");
+  if (ck) ck.onclick = () => decide("checker_approve", { officer: $("#checkerName").value });
 }
 
-function recordHTML(list) {
-  if (!list || !list.length) return "";
+function challengesHTML(list, invalid) {
+  return list.map((c) => `<div class="ch-item"><div class="ch-q"><b>${esc(c.officer)}</b> challenged: “${esc(c.question)}”</div>
+    <div class="ch-a"><b>${c.source === "gemini" ? "Gemini re-checked" : "Re-check"}${c.step === "evidence" ? (c.changed ? ` · changed its view: ${esc(SHORT[c.before] || c.before)} → ${esc(SHORT[c.after] || c.after)}` : " · kept its view") : ""}:</b> ${citeify(c.answer, invalid)}</div></div>`).join("");
+}
+
+async function challengeStep(step, question, btn) {
+  if (!question.trim()) return toast("Write what you want re-checked");
+  btn.disabled = true; btn.textContent = "Gemini is re-checking…";
+  try {
+    data = await api(`/api/cases/${current}/challenge`, { method: "POST", body: JSON.stringify({ step, question, officer: $("#officer").value || "Officer" }) });
+    render();
+    toast(step === "letter" ? "Letter redrafted · challenge logged" : "Re-checked · challenge logged in audit trail");
+  } catch (e) { toast(e.message); btn.disabled = false; btn.textContent = "Ask Gemini to re-check"; }
+}
+
+function recordHTML(all) {
+  const list = (all || []).filter((x) => x.action !== "challenge");
+  if (!list.length) return "";
   const r = list[list.length - 1];
+  if (r.needs_checker) return `
+    <div class="rec-head"><span class="rec-badge warn">Held for second approval</span> <b>${esc(r.officer)}</b> wants to change
+      <i>${(OUTCOME[r.ai_outcome] || [r.ai_outcome])[0]}</i> to <b>${(OUTCOME[r.final_outcome] || [r.final_outcome])[0]}</b></div>
+    <div class="rec-note">Reason: ${esc(r.note)}</div>
+    <div class="rec-note">This pays the customer less than the rules engine recommended. Under the RBI framework the bank carries the burden of proof, so a second officer must confirm before anything is sent.</div>
+    <div class="checker"><input type="text" id="checkerName" placeholder="Second officer's name" /><button class="btn primary sm" id="checkerOk">Confirm override</button></div>`;
   const [act, tone] = ACTION[r.action] || [r.action, "ok"];
   return `
-    <div class="rec-head"><span class="rec-badge ${tone}">${act}</span> by <b>${esc(r.officer)}</b> just now
+    <div class="rec-head"><span class="rec-badge ${tone}">${act}</span> by <b>${esc(r.officer)}</b>${r.checker ? ` · confirmed by <b>${esc(r.checker)}</b>` : ""} just now${r.letter_edited ? " · letter edited by officer" : ""}
       ${r.action === "override" ? ` · AI recommended <i>${(OUTCOME[r.ai_outcome] || [r.ai_outcome])[0]}</i>, officer chose <b>${(OUTCOME[r.final_outcome] || [r.final_outcome])[0]}</b>` : ""}</div>
     ${r.note ? `<div class="rec-note">Reason: ${esc(r.note)}</div>` : ""}
     <div class="rec-grid">
@@ -280,7 +326,7 @@ async function decide(action, extra = {}) {
     data.decisions = r.decisions;
     render();
     $("#record").scrollIntoView({ behavior: "smooth", block: "center" });
-    toast(action === "approve" ? "Approved · saved to audit trail" : action === "override" ? "Override saved · letter rewritten" : "Document request logged");
+    toast(action === "approve" ? "Approved · saved to audit trail" : action === "checker_approve" ? "Second approval recorded · override released" : action === "override" ? ((r.decisions.filter((x) => x.action !== "challenge").slice(-1)[0] || {}).needs_checker ? "Override held for a second officer" : "Override saved · letter rewritten") : "Document request logged");
     loadQueue();
   } catch (e) { toast(e.message); }
 }
