@@ -24,6 +24,10 @@ const CLS = {
 const TYPE = { LOGIN: "Login", DEVICE_BIND: "New device", SIM_SWAP: "SIM swap", OTP_SENT: "OTP sent", AUTH: "Authorisation", TXN: "Transaction",
   BANK_ALERT: "Bank alert", LIVENESS: "Liveness check", COMPLAINT_BANK: "Reported to bank", COMPLAINT_1930: "Reported to 1930", RECOVERY: "Recovery",
   BREACH_ADVISORY: "Breach advisory", APP_INSTALL: "App installed", SCAM_WARNING: "Scam warning", PHISHING_SMS: "Phishing SMS", CALL_REPORTED: "Scam call", CONTACT_UPDATE: "Contact update" };
+const TAG = {
+  C1001: ["SIM swap", "t-third"], C1002: ["Fake KYC call", "t-cust"], C1003: ["Card data leak", "t-third"], C1004: ["Remote-access app", "t-cust"],
+  C1005: ["Bank error", "t-bank"], C1006: ["Missing log", "t-gap"], C1007: ["Phishing link", "t-cust"], C1008: ["Disputed purchase", "t-gen"],
+};
 const STATUS = { NEW: ["New", "s-new"], ANALYSED: ["Analysed", "s-done"], APPROVE: ["Approved", "s-ok"], OVERRIDE: ["Overridden", "s-warn"], REQUEST_INFO: ["Info requested", "s-warn"] };
 
 let current = null;
@@ -49,6 +53,7 @@ async function loadQueue() {
     return `
     <button class="q ${c.case_id === current ? "active" : ""}" data-id="${c.case_id}">
       <div class="q-row"><span class="q-name">${esc(c.customer)}</span><span class="q-amt mono">${inr(c.amount)}</span></div>
+      <div class="q-tag ${(TAG[c.case_id] || ["", "t-gen"])[1]}">${(TAG[c.case_id] || [c.segment])[0]}</div>
       <div class="q-story">${esc(c.story)}</div>
       <div class="q-row q-meta"><span><span class="sdot ${cls}"></span>${st}</span><span>${c.days_left}d left · <span class="mono">${c.case_id}</span></span></div>
     </button>`;
@@ -135,6 +140,8 @@ function render() {
       </div>
     </section>
 
+    <section class="record" id="record">${recordHTML(data.decisions)}</section>
+
     <details class="pipeline">
       <summary><span class="dot ok"></span>${STEPS.length} agents ran · ${gemSteps} on Gemini · ${(totalMs / 1000).toFixed(1)}s · verifier ${v.citations_valid}/${v.citations_checked}</summary>
       <div class="rail done">${STEPS.map((s) => { const t = (data.trace || []).find((x) => x.agent === s) || {}; return `<div class="node on"><span></span><em>${s}</em><small>${t.source === "gemini" ? "Gemini" : t.source === "fallback" ? "fallback" : "code"}${t.ms ? " · " + (t.ms / 1000).toFixed(1) + "s" : ""}</small></div>`; }).join("")}</div>
@@ -189,7 +196,7 @@ function render() {
       <h3>Decision letter <span class="tag">${data.letter.source === "gemini" ? "drafted by Gemini" : "template"} · editable</span>
         <button class="btn ghost sm" id="download">Download</button></h3>
       <textarea id="letter">${esc(last ? last.letter : data.letter.text)}</textarea>
-      <div class="audit" id="audit">${auditHTML(data.decisions)}</div>
+
     </section>`;
 
   document.querySelectorAll(".cite[data-ev]").forEach((el) => (el.onclick = (e) => { e.preventDefault(); e.stopPropagation(); flash(el.dataset.ev); }));
@@ -205,9 +212,31 @@ function render() {
   $("#download").onclick = downloadLetter;
 }
 
-function auditHTML(list) {
+const ACTION = { approve: ["Approved", "ok"], override: ["Overridden", "warn"], request_info: ["Information requested", "warn"] };
+function recordHTML(list) {
   if (!list || !list.length) return "";
-  return `<div class="q-head">Audit trail</div>` + list.map((r) => `<div>${r.at.slice(0, 19).replace("T", " ")} UTC · <b>${esc(r.officer)}</b> · ${r.action.replace("_", " ")} · AI: ${r.ai_outcome} → final: ${r.final_outcome}${r.note ? " · " + esc(r.note) : ""}</div>`).join("");
+  const r = list[list.length - 1];
+  const [act, tone] = ACTION[r.action] || [r.action, "ok"];
+  const when = new Date(r.at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+  return `
+    <div class="rec-head"><span class="rec-badge ${tone}">${act}</span> by <b>${esc(r.officer)}</b> · ${when}
+      ${r.action === "override" ? ` · AI said <i>${(OUTCOME[r.ai_outcome] || [r.ai_outcome])[0]}</i>, officer chose <b>${(OUTCOME[r.final_outcome] || [r.final_outcome])[0]}</b>` : ""}</div>
+    ${r.note ? `<div class="rec-note">Reason: ${esc(r.note)}</div>` : ""}
+    <div class="rec-grid">
+      <div>
+        <div class="q-head">What happens next</div>
+        <ol class="rec-steps">
+          <li><b>Audit record saved</b><span>${r.saved_to === "firestore" ? "Firestore · decisions/" + esc(current) + "/audit" : "Audit log (in memory)"}, with the AI recommendation, the officer's choice and the full letter</span></li>
+          ${(r.dispatch || []).map((d) => `<li><b>${esc(d.step)}</b><span>${esc(d.to)} · ${esc(d.status)}</span></li>`).join("")}
+        </ol>
+        <div class="note">Prototype: letters, SMS and refunds are recorded, not actually sent. In a bank they go to its email/SMS gateway and core-banking system.</div>
+      </div>
+      <div>
+        <div class="q-head">What the customer receives (SMS)</div>
+        <div class="sms"><div class="sms-from">Bank</div>${esc(r.sms || "")}</div>
+      </div>
+    </div>
+    ${list.length > 1 ? `<details class="history"><summary>Earlier actions (${list.length - 1})</summary>${list.slice(0, -1).reverse().map((x) => `<div>${new Date(x.at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })} · ${esc(x.officer)} · ${(ACTION[x.action] || [x.action])[0]} · ${(OUTCOME[x.final_outcome] || [x.final_outcome])[0]}</div>`).join("")}</details>` : ""}`;
 }
 
 function flash(id) {
@@ -225,8 +254,11 @@ async function decide(action, extra = {}) {
       body: JSON.stringify({ action, officer: $("#officer").value || "Officer", letter: $("#letter").value, resolved_items: resolved, note: "", ...extra }),
     });
     data.decisions = r.decisions;
-    $("#audit").innerHTML = auditHTML(r.decisions);
-    toast(action === "approve" ? "Decision approved and letter queued" : action === "override" ? "Override saved" : "Information request logged");
+    $("#record").innerHTML = recordHTML(r.decisions);
+    if (r.saved && r.saved.letter) $("#letter").value = r.saved.letter;
+    $("#overrideBox").classList.remove("show");
+    $("#record").scrollIntoView({ behavior: "smooth", block: "center" });
+    toast(action === "approve" ? "Approved · saved to audit log · letter queued" : action === "override" ? "Override saved · letter rewritten" : "Information request queued");
     loadQueue();
   } catch (e) { toast(e.message); }
 }

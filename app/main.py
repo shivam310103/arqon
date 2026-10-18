@@ -86,12 +86,46 @@ def decide(case_id: str, body: DecisionIn):
     open_items = [m["item"] for m in ai["decision"]["missing"] if m["item"] not in body.resolved_items]
     if body.action == "approve" and open_items:
         raise HTTPException(400, "Resolve or waive all missing information before approving: " + "; ".join(open_items))
+    final = body.outcome or ai["decision"]["outcome"]
+    letter = body.letter or ai["letter"]["text"]
+    case = ai["case"]
+    amounts = ai["decision"]["amounts"]
+    if body.action == "override":
+        letter = (f"Dear {case['customer']},\n\nRe: Your complaint received on {case['received_on']} (Case {case_id})\n\n"
+                  f"Following review by our officer ({body.officer}), the decision on your claim is: {OUTCOME_LABEL.get(final, final)}.\n\n"
+                  f"Reason: {body.note.strip()}\n\nIf you are not satisfied, you may approach the RBI Ombudsman via cms.rbi.org.in.\n\n"
+                  f"Grievance Redressal Cell")
+    # What happens next. In production these are calls to the bank's notification and core-banking systems;
+    # in this prototype they are recorded, not executed.
+    dispatch = []
+    if body.action in ("approve", "override"):
+        dispatch.append({"step": "Decision letter", "to": f"{case['customer']} · registered email + SMS link", "status": "queued (simulated)"})
+        pays = amounts.get("bank_pays") if final == ai["decision"]["outcome"] else None
+        if final in ("ZERO_LIABILITY_REFUND", "CUSTOMER_LIABLE") and pays:
+            dispatch.append({"step": "Refund instruction", "to": "Core banking", "status": f"₹{pays:,} credit, value-dated to transaction date (simulated)"})
+        if final in ("COMPENSATION",) and amounts.get("compensation"):
+            dispatch.append({"step": "Compensation payout", "to": "Core banking · claim to RBI fund", "status": f"₹{amounts['compensation']:,} within 5 days (simulated)"})
+    else:
+        dispatch.append({"step": "Information request", "to": f"{case['customer']} · SMS + email", "status": "queued (simulated)"})
+    sms = {
+        "approve": f"Your fraud claim {case_id} has been decided: {OUTCOME_LABEL.get(final, final)}. The full letter is in your email. Not satisfied? cms.rbi.org.in",
+        "override": f"Your fraud claim {case_id} has been decided after officer review: {OUTCOME_LABEL.get(final, final)}. The full letter is in your email.",
+        "request_info": f"We need more information to decide your fraud claim {case_id}. Please check your email and reply within 7 days.",
+    }[body.action]
     rec = store.save_decision(case_id, {
         "action": body.action, "officer": body.officer, "note": body.note, "resolved_items": body.resolved_items,
-        "ai_outcome": ai["decision"]["outcome"], "final_outcome": body.outcome or ai["decision"]["outcome"],
-        "letter": body.letter or ai["letter"]["text"],
+        "ai_outcome": ai["decision"]["outcome"], "final_outcome": final, "letter": letter,
+        "dispatch": dispatch, "sms": sms, "saved_to": store.decision_store(),
     })
     return {"saved": rec, "decisions": store.get_decisions(case_id)}
+
+
+OUTCOME_LABEL = {
+    "ZERO_LIABILITY_REFUND": "Full refund, zero liability", "COMPENSATION": "Compensation payable",
+    "CUSTOMER_LIABLE": "Customer liable", "BANK_POLICY_REVIEW": "Referred to bank policy",
+    "PENDING_CUSTOMER_ACTION": "Pending customer action", "INCOMPLETE_EVIDENCE": "Under review",
+    "REJECT_NOT_FRAUD": "Claim rejected: genuine transaction",
+}
 
 
 @app.get("/api/evals")
