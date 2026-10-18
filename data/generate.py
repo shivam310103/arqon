@@ -53,7 +53,7 @@ def case_1():
         "case_id": "C1001", "customer": "Priya Sharma", "account_type": "individual", "segment": "Savings",
         "received_on": "2027-02-04", "as_of": "2027-02-06", "cross_border": False, "prior_compensation": False,
         "complaint_text": (
-            "On the night of 3 Feb my phone suddenly lost network. Next morning I saw Rs 40,000 had gone from my account "
+            "On the night of 3 Feb my phone suddenly lost network. Next morning I saw ₹40,000 had gone from my account "
             "by UPI to someone I do not know. I never shared any OTP or PIN with anyone. The telecom store says my SIM was "
             "replaced on 3 Feb but I did not go there. I have also filed a complaint on the cybercrime portal, ref NCRP-27-118842."
         ),
@@ -78,8 +78,8 @@ def case_2():
         "received_on": "2027-02-10", "as_of": "2027-02-15", "cross_border": False, "prior_compensation": False,
         "complaint_text": (
             "A man called saying he was from the bank KYC team and my account would be blocked. He asked me to read out "
-            "the OTP I received, and I did. Rs 30,000 was transferred out. I called 1930 at once (ref 1930-27-552190) and "
-            "then the bank. I was told Rs 10,000 has been frozen and returned."
+            "the OTP I received, and I did. ₹30,000 was transferred out. I called 1930 at once (ref 1930-27-552190) and "
+            "then the bank. I was told ₹10,000 has been frozen and returned."
         ),
         "events": b.events,
         "expected": {"classification": "CUSTOMER_NEGLIGENCE", "outcome": "COMPENSATION", "bank_pays": 0, "compensation": 17000},
@@ -101,7 +101,7 @@ def case_3():
         "case_id": "C1003", "customer": "Ananya Rao", "account_type": "individual", "segment": "Credit card",
         "received_on": "2027-02-08", "as_of": "2027-02-09", "cross_border": False, "prior_compensation": False,
         "complaint_text": (
-            "I noticed two online purchases of Rs 18,000 and Rs 12,000 on my card from 1 Feb which I did not make. "
+            "I noticed two online purchases of ₹18,000 and ₹12,000 on my card from 1 Feb which I did not make. "
             "I was travelling and only checked my email on 8 Feb. I have never shared my card details."
         ),
         "events": b.events,
@@ -127,12 +127,12 @@ def case_4():
         "received_on": "2027-02-15", "as_of": "2027-02-17", "cross_border": False, "prior_compensation": False,
         "complaint_text": (
             "I joined a stock tips group and they asked me to install an app so they could guide me. While the app was on "
-            "they moved Rs 50,000 and Rs 30,000 from my account. I called the bank at 9:10 pm and 1930, but another "
-            "Rs 10,000 went at 9:53 pm even after I reported it."
+            "they moved ₹50,000 and ₹30,000 from my account. I called the bank at 9:10 pm and 1930, but another "
+            "₹10,000 went at 9:53 pm even after I reported it."
         ),
         "events": b.events,
         "expected": {"classification": "CUSTOMER_NEGLIGENCE", "outcome": "CUSTOMER_LIABLE", "bank_pays": 10000, "compensation": 0},
-        "story": "Remote-access app scam, warning ignored, Rs 80k before reporting plus Rs 10k after",
+        "story": "Remote-access app scam, warning ignored, ₹80k before reporting plus ₹10k after",
     }
 
 
@@ -150,7 +150,7 @@ def case_5():
         "case_id": "C1005", "customer": "Fatima Khan", "account_type": "individual", "segment": "Savings",
         "received_on": "2027-02-10", "as_of": "2027-02-11", "cross_border": False, "prior_compensation": False,
         "complaint_text": (
-            "I gave a written request on 20 Jan to change my mobile number. I found in my statement that Rs 15,000 was "
+            "I gave a written request on 20 Jan to change my mobile number. I found in my statement that ₹15,000 was "
             "sent by NEFT on 1 Feb. I never got any OTP or SMS because the bank was still using my old number."
         ),
         "events": b.events,
@@ -172,7 +172,7 @@ def case_6():
         "case_id": "C1006", "customer": "Arjun Nair", "account_type": "individual", "segment": "Savings",
         "received_on": "2027-02-19", "as_of": "2027-02-20", "cross_border": False, "prior_compensation": False,
         "complaint_text": (
-            "Rs 20,000 and Rs 15,000 went out by UPI on the evening of 18 Feb. I did not do these and did not share any OTP. "
+            "₹20,000 and ₹15,000 went out by UPI on the evening of 18 Feb. I did not do these and did not share any OTP. "
             "I reported to 1930 and the bank the next morning."
         ),
         "events": b.events,
@@ -191,7 +191,7 @@ def case_7():
         "case_id": "C1007", "customer": "Meera Joshi", "account_type": "individual", "segment": "Debit card",
         "received_on": "2027-02-22", "as_of": "2027-02-23", "cross_border": False, "prior_compensation": False,
         "complaint_text": (
-            "I got an SMS saying my electricity would be cut. I opened the link and paid, and entered the OTP. Later Rs 25,000 "
+            "I got an SMS saying my electricity would be cut. I opened the link and paid, and entered the OTP. Later ₹25,000 "
             "was charged instead. I am reporting this to the bank. I have not filed any police or cyber complaint yet."
         ),
         "events": b.events,
@@ -214,7 +214,7 @@ def case_8():
         "case_id": "C1008", "customer": "Rohit Verma", "account_type": "individual", "segment": "Savings",
         "received_on": "2027-02-13", "as_of": "2027-02-14", "cross_border": False, "prior_compensation": False,
         "complaint_text": (
-            "There is a Rs 12,000 payment to TechKart on 12 Feb which I do not recognise. Please reverse it."
+            "There is a ₹12,000 payment to TechKart on 12 Feb which I do not recognise. Please reverse it."
         ),
         "events": b.events,
         "expected": {"classification": "NOT_FRAUD", "outcome": "REJECT_NOT_FRAUD", "bank_pays": 0, "compensation": 0},

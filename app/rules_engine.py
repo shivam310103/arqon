@@ -87,7 +87,7 @@ def evaluate(case: dict, facts: dict) -> Decision:
     net_pre = max(pre_loss - recovered, 0)
 
     findings.append(Finding("Disputed transactions", "info",
-                            f"{len(txns)} disputed, total Rs {gross:,}; recovered Rs {recovered:,}",
+                            f"{len(txns)} disputed, total ₹{gross:,}; recovered ₹{recovered:,}",
                             [t["event_id"] for t in txns]))
     if bank_report:
         res = "pass" if days_to_bank is not None and days_to_bank <= window else "fail"
@@ -103,14 +103,14 @@ def evaluate(case: dict, facts: dict) -> Decision:
                                 [ncrp_report["event_id"]], "R4"))
     if post:
         findings.append(Finding("Transactions after the fraud was reported", "info",
-                                f"Rs {post_loss:,} debited after reporting; bank bears this",
+                                f"₹{post_loss:,} debited after reporting; bank bears this",
                                 [t["event_id"] for t in post], "R3"))
 
     # ---- evidence completeness (burden of proof, R5) ----
     for t in txns:
         tid = t["attrs"]["txn_id"]
         if tid not in auths:
-            missing.append({"item": f"Authentication log for {tid} (Rs {t['attrs']['amount']:,})",
+            missing.append({"item": f"Authentication log for {tid} (₹{t['attrs']['amount']:,})",
                             "why": "Bank must prove how this transaction was authorised before assigning liability",
                             "evidence": t["event_id"], "rule": "R5"})
 
@@ -189,8 +189,8 @@ def evaluate(case: dict, facts: dict) -> Decision:
         first_claim = not case.get("prior_compensation")
         bank_ok = days_to_bank is not None and days_to_bank <= window
         comp = min(round(net_pre * K["compensation_rate"]), K["compensation_max"])
-        findings.append(Finding("Compensation: net loss within Rs 50,000", "pass" if eligible_amount else "fail",
-                                f"Net loss before reporting Rs {net_pre:,}", [], "R4"))
+        findings.append(Finding("Compensation: net loss within ₹50,000", "pass" if eligible_amount else "fail",
+                                f"Net loss before reporting ₹{net_pre:,}", [], "R4"))
         if eligible_amount and in_scheme and individual and first_claim and bank_ok:
             rules.append("R4")
             if ncrp_report and days_to_1930 <= window:

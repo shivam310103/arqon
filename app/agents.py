@@ -149,11 +149,11 @@ DRAFT_SYS = (
 )
 
 OUTCOME_LINES = {
-    "ZERO_LIABILITY_REFUND": "We have accepted your claim in full. Rs {bank_pays:,} will be credited to your account, value-dated to the transaction date.",
-    "COMPENSATION": "You are eligible for compensation of Rs {compensation:,} under the small-value fraud scheme. It will be paid within 5 calendar days.",
-    "CUSTOMER_LIABLE": "Based on the evidence, the loss before you reported the fraud arose from customer negligence and is not reimbursable. Rs {bank_pays:,} debited after your report will be credited to you.",
+    "ZERO_LIABILITY_REFUND": "We have accepted your claim in full. ₹{bank_pays:,} will be credited to your account, value-dated to the transaction date.",
+    "COMPENSATION": "You are eligible for compensation of ₹{compensation:,} under the small-value fraud scheme. It will be paid within 5 calendar days.",
+    "CUSTOMER_LIABLE": "Based on the evidence, the loss before you reported the fraud arose from customer negligence and is not reimbursable. ₹{bank_pays:,} debited after your report will be credited to you.",
     "BANK_POLICY_REVIEW": "The fraud was reported after the 5-day zero-liability window, so your claim will be decided under the bank's board-approved policy. An officer will contact you.",
-    "PENDING_CUSTOMER_ACTION": "You may be eligible for compensation of Rs {compensation:,}. To complete your claim, please file a complaint on 1930 or cybercrime.gov.in by {by} and share the reference with us.",
+    "PENDING_CUSTOMER_ACTION": "You may be eligible for compensation of ₹{compensation:,}. To complete your claim, please file a complaint on 1930 or cybercrime.gov.in by {by} and share the reference with us.",
     "INCOMPLETE_EVIDENCE": "We are still examining your complaint. We have not assigned any liability to you and will write again once our review is complete.",
     "REJECT_NOT_FRAUD": "Our records show the transaction was authorised from your registered device with biometric verification and a passed liveness check. We are therefore unable to treat it as fraudulent.",
 }
